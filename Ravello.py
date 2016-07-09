@@ -1,4 +1,4 @@
-#!/usr/bin/python2.7
+#!/usr/bin/python2.7 -B
 ## This Script is to Process Ravello Stats and process the records
 ##
 ## Author: Ahmed Sammoud
@@ -23,17 +23,13 @@
 ##
 ##
 
-import pprint
-import logging
+import ConfigParser
 import argparse
 import sys
-import re
-import ConfigParser
+
+from csv_ravello import *
 from db_store import *
 from ravello_sdk_interface import *
-from csv_import import *
-
-
 
 ## Moved to Config file for the script.
 #DB = "mongodb://localhost:27017"
@@ -55,7 +51,7 @@ def main():
     ########################################
     #
     #Initiating Command-Line Parsing 
-    #
+    #q
     
     parser = argparse.ArgumentParser(prog='Rev_Stat',
                                      description='Ravello Stats Storing/Reporting tool:')
@@ -112,11 +108,9 @@ def main():
     pp = None
 
     
-    # Check number of options on the command line
+    # Check number of options on the command line and initialize main classes if valid
     if len(sys.argv) > 1:
         Rev_DB  = Rev_Store(DB)
-        Rev_Con = Rev_Connect(username,password)
-        Rev_csv = CSV_Import()
         pp = pprint.PrettyPrinter()
 
 
@@ -126,6 +120,9 @@ def main():
     # Get Data from Ravello, Store it in db
     if args.gdb != None :
         logger.debug("Get Data from Ravello, Store it in db... Arguments Passed: "+str(args.gdb))
+
+
+        Rev_Con = Rev_Connect(username,password)
         Rev_Con.Rev_Login()
         month = args.gdb[0]
         
@@ -161,20 +158,23 @@ def main():
             year  = re.search("\d\d\d\d",month).group(0)
             month = re.search("\d\d",month).group(0)
 
-            
+
+        Rev_Con = Rev_Connect(username,password)
         Rev_Con.Rev_Login()
         
-        # Get App List 
+        # Get App List
+        logger.debug("Retrieve Apps List >>>")
         list = Rev_Con.Rev_GetAppList()
         list_app = list
         Rev_DB.Store(list_app,"Apps")
       
         # Get billing for that month.
+        logger.debug("Retrieve Billing Information for "+str(args.gdbr[0]))
         list = Rev_Con.Rev_GetBillingMonth(month,year)
         Rev_DB.Store(list,"Billing")
 
         # Report Generation
-        csv = CSV_Import(filename="result.csv",perm='wb')
+        Rev_csv = CSV_Rev(filename="result.csv",perm='wb')
         csv.store_Rows(Rev_DB.Report())
         
         
@@ -193,7 +193,6 @@ def main():
             logger.error("Month format Must be 'XX XXXX'")
             return
 
-        Rev_Con.Rev_Login()
 
         result_user = None
         result_course = None
@@ -205,7 +204,7 @@ def main():
             ####################################################
             logger.debug("Reporting \"ALL\" Date: "+str(month))
             
-            csv = CSV_Import(filename="result_All.csv",perm='wb')
+            Rev_csv = CSV_Rev(filename="Report_All.csv",perm='wb')
             
             result_user = Rev_DB.Report_Users_Total(month)
             result_course = Rev_DB.Report_Courses_Total(month)
@@ -236,59 +235,54 @@ def main():
             for l in result_region:
                 list.append([l["_id"],l["# of students"],l["total"]])
             
-            csv.store_Rows(list)
+            Rev_csv.store_Rows(list)
 
                 
         elif report == "Users":
             logger.debug("Reporting \"User\"")
-            csv = CSV_Import(filename="result_Users.csv",perm='wb')
+            csv = CSV_Rev(filename="Report_Users.csv",perm='wb')
             result_user = Rev_DB.Report_Users_Total(month)
             list.append(["All Users Information"])
             list.append(["Username","Courses","Department","Total"])
             for l in result_user:
                 list.append([l["_id"],l["Courses"],l["Department"],l["total"]])
 
-            csv.store_Rows(list)
+            Rev_csv.store_Rows(list)
                                                         
         
         elif report == "Courses":
             logger.debug("Reporting \"Course\"")
             result_course = Rev_DB.Report_Courses_Total(month)
-            csv = CSV_Import(filename="result_Courses.csv",perm='wb')
+            csv = CSV_Rev(filename="Report_Courses.csv",perm='wb')
             list.append(["All Courses Information"])
             list.append(["Course name","# of users","Department","total"])
             for l in result_course:
                 list.append([l["_id"],l["# of students"],l["Department"],l["total"]])
-            csv.store_Rows(list)
+            Rev_csv.store_Rows(list)
                                                         
         elif report == "Departments":
             logger.debug("Reporting \"Department\"")
             result_dept = Rev_DB.Report_Dept_Total(month)
-            csv = CSV_Import(filename="result_Department.csv",perm='wb')
+            Rev_csv = CSV_Rev(filename="Report_Department.csv",perm='wb')
             list.append(["All Department Information"])
             list.append(["Department","# of students","Total"])
             for l in result_dept:
                 list.append([l["_id"],l["# of students"],l["total"]])
-            csv.store_Rows(list)
+            Rev_csv.store_Rows(list)
                    
             
         elif report == "Regions":
             logger.debug("Reporting \"Region\"")
-            csv = CSV_Import(filename="result_Region.csv",perm='wb')
+            Rev_csv = CSV_Rev(filename="Report_Region.csv",perm='wb')
             result_region = Rev_DB.Report_Region_Total(month)
             list.append(["All Region Information"])
             list.append(["Region","# of students","Total"])
             for l in result_region:
                 list.append([l["_id"],l["# of students"],l["total"]])
             
-            csv.store_Rows(list)
+            Rev_csv.store_Rows(list)
                                                         
-            
 
-            '''
-        for R in result:
-            print(">> "+str(R)) 
-            '''
         
     # Import a CSV amd store it in DB
     elif (args.import_csv) != None:
@@ -303,6 +297,7 @@ def main():
             return
         
         #get list
+        Rev_csv = CSV_Rev(file)
         list =Rev_csv.getlist()
         
         total  =0
@@ -373,14 +368,13 @@ main()
         
         #for l in list :
         #    print(">> "+l)
-            
+
        
         for x in range(1,13):
             # Get results from DB
             for d in ( (Rev_DB.Get_BillMonth("{:0>2d}".format(x),"2016")) ):
                 print(">>>>>>>>> "+ "{:0>2d}".format(x),"2016" )
                 pp.pprint(d["total"])
-                   
        
         list = Rev_Con.Rev_GetBillingToMonth()
         #list_app = list["appList"]

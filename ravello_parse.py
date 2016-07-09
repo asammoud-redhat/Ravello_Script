@@ -91,8 +91,12 @@ class Rev_Parse:
                 tmp = app_name.split("__")
                 dict["username"] = (tmp[0])[2:]
 
-        
-            dict["blueprint"],dict["class"] = self.__Get_Bp_class__(record["blueprintName"].strip())
+            if "blueprintName" in record.keys() :
+                dict["blueprint"],dict["class"] = self.__Get_Bp_class__(record["blueprintName"].strip())
+            else :
+                dict["blueprint"] =  "N/A"
+                dict["class"]     =  "N/A"
+                record["blueprintName"] = "N/A"
 
             # Not all applications have deployment information
             if "deployment" in record.keys():
@@ -105,14 +109,14 @@ class Rev_Parse:
             dict["applicationId"] = record["id"]
             dict["published"]     = record["published"]
             dict["owner"]   = record["owner"]
-            self.logger.debug("App Parsed :"+str(dict)+"\n*Record >>>>>>>:"+str(record))
+            self.logger.debug("Parse_AppInfo :"+str(dict)+"\n*Record >>>>>>>:"+str(record))
             return dict
         except Exception as e :
-            self.logger.warning("Error While Parsing " + str(e))
-            self.logger.debug("App_Info_>> Current record id:"+str(record["id"])+" .. name:"+str(record["name"]) +" is dropped")
-            self.logger.debug("APP_Info_>> Record :"+str(pp.pprint(record)))
-            self.logger.debug("APP_Info_>> Result :"+str(pp.pprint(dict)))
-
+            self.logger.error("Error While Parsing " + str(e))
+            self.logger.debug("Parse_AppInfo_>> Current record id:"+str(record["id"])+" .. name:"+str(record["name"]) +" is dropped")
+            self.logger.debug("Parse_APPInfo_>> Record :"+ str(record))
+            self.logger.debug("Parse APPInfo_>> Result :"+str(dict))
+            
     # Only process the charges entry in ravello data,
     # This most probably to be used with total billing for specific months.
     # Returns a float.
@@ -146,9 +150,13 @@ class Rev_Parse:
             tmp = app_name.split("__")
             dict["username"] = (tmp[0])[2:]
 
-            
-        dict["blueprint"],dict["class"] = self.__Get_Bp_class__(record["blueprintName"].strip())
-       
+        if "blueprintName" in record.keys():
+            dict["blueprint"], dict["class"] = self.__Get_Bp_class__(record["blueprintName"].strip())
+        else:
+            dict["blueprint"] = "N/A"
+            dict["class"] = "N/A"
+            record["blueprintName"] = "N/A"
+
         total =0
         for x in record["charges"]:
             total += float(x["summaryPrice"])
@@ -159,6 +167,9 @@ class Rev_Parse:
         dict["upTime"]        = record["upTime"]
         dict["status"]  =  "deleted" if record["deleted"] else "ACTIVE"
         dict["owner"]   = record["owner"]
+
+        # Ensures nothing went wrong, otherwise report it
+        assert(dict != None),self.logger.error("None Dict detected, Record recieved is "+str(record))
         return dict
 
 #pp = pprint.PrettyPrinter()

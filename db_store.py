@@ -84,6 +84,7 @@ class Rev_Store:
         if(db == "Apps"):
             if Coll != None :
                 for r in record:
+                    self.logger.debug("###APPS: Record : \n"+str(r))
                     # This will Upserts
                     self.logger.debug("Apps: Updatting > Id: "+str(r["applicationId"]))
                     result = Coll.update_many({"applicationId":r["applicationId"]},{"$set":r},upsert=True)
